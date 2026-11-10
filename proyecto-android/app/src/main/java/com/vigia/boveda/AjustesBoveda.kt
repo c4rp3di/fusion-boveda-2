@@ -12,6 +12,17 @@ object AjustesBoveda {
     fun autobloqueoSegundos(c: Context): Int = p(c).getInt("autobloqueo", 60)
     fun setAutobloqueoSegundos(c: Context, v: Int) = p(c).edit().putInt("autobloqueo", v).apply()
 
+    /**
+     * Segundos que la bóveda sigue abierta tras usar el teclado (🔑). Nunca baja del autobloqueo normal.
+     * La clave sigue viviendo solo en memoria: esto solo alarga el temporizador, no guarda nada en disco.
+     */
+    fun puenteSegundos(c: Context): Int = p(c).getInt("puente_segundos", 300)
+    fun setPuenteSegundos(c: Context, v: Int) = p(c).edit().putInt("puente_segundos", v).apply()
+
+    /** Si es true, apagar la pantalla no bloquea mientras dure la ventana del teclado. Desactivado por defecto. */
+    fun puenteSobrevivePantalla(c: Context): Boolean = p(c).getBoolean("puente_pantalla", false)
+    fun setPuenteSobrevivePantalla(c: Context, v: Boolean) = p(c).edit().putBoolean("puente_pantalla", v).apply()
+
     fun bloquearAlApagarPantalla(c: Context): Boolean = p(c).getBoolean("bloq_pantalla", true)
     fun setBloquearAlApagarPantalla(c: Context, v: Boolean) = p(c).edit().putBoolean("bloq_pantalla", v).apply()
 
