@@ -1,0 +1,145 @@
+name: Build APK Nativo
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Nombre de la app'
+        required: true
+      app_package:
+        description: 'Paquete de la app'
+        required: false
+        default: ''
+      app_version_code:
+        description: 'Código de versión (informativo; ya va horneado en build.gradle)'
+        required: false
+        default: ''
+      app_version_name:
+        description: 'Nombre de versión, usado para el nombre del APK del release'
+        required: false
+        default: ''
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restaurar caché de Gradle (dependencias + wrapper)
+        id: cache-gradle
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('proyecto-android/build.gradle', 'proyecto-android/settings.gradle', 'proyecto-android/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+      - name: Restaurar caché del build de la app (por paquete)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            proyecto-android/app/build
+            proyecto-android/.gradle
+          key: appbuild-${{ runner.os }}-${{ github.event.inputs.app_package }}-${{ github.run_id }}
+          restore-keys: |
+            appbuild-${{ runner.os }}-${{ github.event.inputs.app_package }}-
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configurar SDK de Android
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          CMDLINE_TOOLS_BIN=$(find /usr/local/lib/android/sdk/cmdline-tools -maxdepth 3 -name sdkmanager -exec dirname {} \; | sort -V | tail -1)
+          if [ -z "$CMDLINE_TOOLS_BIN" ]; then
+            echo "::error::No se encontró sdkmanager bajo /usr/local/lib/android/sdk/cmdline-tools"
+            exit 1
+          fi
+          echo "$CMDLINE_TOOLS_BIN" >> "$GITHUB_PATH"
+      - name: Aceptar licencias e instalar plataforma y build-tools (solo si faltan)
+        run: |
+          SDK="$ANDROID_HOME"
+          if [ -z "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          if [ -d "$SDK/platforms/android-34" ] && [ -d "$SDK/build-tools/34.0.0" ]; then
+            echo "SDK android-34 ya presente, se omite la descarga."
+          else
+            yes | sdkmanager --licenses > /dev/null || true
+            sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          fi
+      - name: Generar keystore debug si no existe
+        working-directory: proyecto-android
+        run: |
+          set -e
+          mkdir -p apk-build
+          if [ -f apk-build/debug.keystore ]; then
+            echo "Ya existe apk-build/debug.keystore en el repo, se reutiliza para que la firma sea estable entre builds."
+          else
+            echo "No hay keystore en el repo todavía: se genera uno nuevo y se sube para que quede fijo a partir de ahora."
+            keytool -genkeypair -v \
+              -keystore apk-build/debug.keystore \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add apk-build/debug.keystore
+            git commit -m "Añade keystore debug estable para firmar APKs"
+            git push || echo "::warning::No se pudo subir el keystore al repo (posible protección de rama). La firma NO quedará fija entre builds hasta que subas apk-build/debug.keystore manualmente con estos mismos parámetros."
+          fi
+      - name: Compilar APK
+        working-directory: proyecto-android
+        run: |
+          set -e
+          # v10.1 · El gradle preinstalado en el runner ya es 9.x: si se ejecuta dentro del
+          # proyecto, evalúa los plugins (Kotlin 1.9, AGP 8.x) con Gradle 9 y falla
+          # ("org/gradle/util/VersionNumber"). El wrapper se genera en una carpeta con un
+          # settings.gradle vacío (Gradle exige una raíz de build) y se copia al proyecto;
+          # la compilación la hace ya el Gradle fijado por el wrapper.
+          WRAP_TMP="$(mktemp -d)"
+          touch "$WRAP_TMP/settings.gradle"
+          (cd "$WRAP_TMP" && (gradle wrapper --gradle-version 8.7 --no-validate-url --no-daemon || (sleep 15 && gradle wrapper --gradle-version 8.7 --no-validate-url --no-daemon)))
+          mkdir -p gradle
+          cp -r "$WRAP_TMP/gradle/." gradle/
+          cp "$WRAP_TMP/gradlew" "$WRAP_TMP/gradlew.bat" .
+          chmod +x gradlew
+          # v10.2 · services.gradle.org a veces tarda más de los 10 s por defecto: se sube el timeout
+          # y se reintenta SOLO la descarga de Gradle (la compilación se ejecuta una vez).
+          sed -i 's/^networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
+          ./gradlew --version --no-daemon || (sleep 20 && ./gradlew --version --no-daemon) || (sleep 40 && ./gradlew --version --no-daemon)
+          ./gradlew assembleDebug --no-daemon
+      - name: Crear release con el APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          APP_PACKAGE: ${{ github.event.inputs.app_package }}
+          APP_VERSION_NAME: ${{ github.event.inputs.app_version_name }}
+        run: |
+          set -e
+          TAG="apk-nativo-$(date +%s)"
+          APK_PATH=$(find . -name "*.apk" | head -n1)
+          SAFE_NAME=$(echo "$APP_NAME" | tr -c 'A-Za-z0-9._-' '_')
+          if [ -n "$APP_VERSION_NAME" ]; then
+            APK_FINAL="$SAFE_NAME-$APP_VERSION_NAME.apk"
+          else
+            APK_FINAL="$SAFE_NAME.apk"
+          fi
+          cp "$APK_PATH" "$APK_FINAL"
+          gh release create "$TAG" "$APK_FINAL" --title "APK nativo: $APP_NAME" --notes "Paquete: $APP_PACKAGE. Compilado desde el código Kotlin/XML/Gradle generado por el editor."
+      - name: Guardar caché de Gradle
+        if: always() && steps.cache-gradle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('proyecto-android/build.gradle', 'proyecto-android/settings.gradle', 'proyecto-android/gradle.properties') }}
+      - name: Guardar caché del build de la app
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            proyecto-android/app/build
+            proyecto-android/.gradle
+          key: appbuild-${{ runner.os }}-${{ github.event.inputs.app_package }}-${{ github.run_id }}
