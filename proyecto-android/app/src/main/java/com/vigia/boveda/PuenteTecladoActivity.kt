@@ -54,7 +54,7 @@ class PuenteTecladoActivity : ActividadBoveda() {
         if (r.resultCode == Activity.RESULT_OK && SesionBoveda.desbloqueada) {
             mostrarSelector()
         } else {
-            responder(PuenteContrato.COD_CANCELADO)
+            responder(PuenteContrato.COD_CANCELADO, "desbloqueo_rc=" + r.resultCode + "_abierta=" + SesionBoveda.desbloqueada)
         }
     }
 
@@ -64,9 +64,14 @@ class PuenteTecladoActivity : ActividadBoveda() {
             finish()
             return
         }
+        // Aviso de vida: el teclado sabe así que la pantalla sí se abrió (y distingue un bloqueo del sistema).
+        try {
+            receptor?.send(PuenteContrato.COD_ABIERTA, null)
+        } catch (e: Exception) {
+        }
         // Si la pantalla se recrea (p. ej. el proceso murió), la petición original ya no es válida.
         if (estado != null) {
-            responder(PuenteContrato.COD_CANCELADO)
+            responder(PuenteContrato.COD_CANCELADO, "recreada")
             return
         }
 
@@ -80,12 +85,12 @@ class PuenteTecladoActivity : ActividadBoveda() {
             destino.isNotEmpty() && destino.length <= 255 &&
             PuenteCanal.esPublicaValida(clavePublicaTeclado)
         if (!valida) {
-            responder(PuenteContrato.COD_ERROR)
+            responder(PuenteContrato.COD_ERROR, "peticion_invalida")
             return
         }
 
         if (!ClavesBoveda.existe(this)) {
-            responder(PuenteContrato.COD_NO_INICIALIZADA)
+            responder(PuenteContrato.COD_NO_INICIALIZADA, "sin_boveda")
             return
         }
 
@@ -229,19 +234,24 @@ class PuenteTecladoActivity : ActividadBoveda() {
             datos.putByteArray(PuenteContrato.RES_PUBLICA_BOVEDA, sobre.publicaBoveda)
             datos.putByteArray(PuenteContrato.RES_IV, sobre.iv)
             datos.putByteArray(PuenteContrato.RES_CIFRADO, sobre.cifrado)
-            responder(PuenteContrato.COD_OK, datos)
+            responder(PuenteContrato.COD_OK, null, datos)
         } catch (e: Exception) {
-            responder(PuenteContrato.COD_ERROR)
+            responder(PuenteContrato.COD_ERROR, "cifrado_" + e.javaClass.simpleName)
         } finally {
             claro.fill(0)
         }
     }
 
-    private fun responder(codigo: Int, datos: Bundle? = null) {
+    private fun responder(codigo: Int, motivo: String? = null, datos: Bundle? = null) {
         if (respondido) return
         respondido = true
         try {
-            receptor?.send(codigo, datos)
+            var salida = datos
+            if (motivo != null) {
+                salida = salida ?: Bundle()
+                salida.putString(PuenteContrato.RES_MOTIVO, motivo)
+            }
+            receptor?.send(codigo, salida)
         } catch (e: Exception) {
             // El teclado pudo haberse cerrado: no hay nadie a quien avisar.
         }
@@ -254,7 +264,7 @@ class PuenteTecladoActivity : ActividadBoveda() {
         if (!respondido) {
             respondido = true
             try {
-                receptor?.send(PuenteContrato.COD_CANCELADO, null)
+                receptor?.send(PuenteContrato.COD_CANCELADO, Bundle().apply { putString(PuenteContrato.RES_MOTIVO, "cerrada") })
             } catch (e: Exception) {
             }
         }
