@@ -27,8 +27,8 @@ android {
         // 26: el framework de autocompletado de Android nace en esa versión.
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName "v3.0"
+        versionCode 4
+        versionName "v4.0"
     }
 
     compileOptions {
