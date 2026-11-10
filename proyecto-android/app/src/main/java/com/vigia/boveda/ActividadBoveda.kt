@@ -14,6 +14,10 @@ abstract class ActividadBoveda : ActividadBase() {
 
     protected open val requiereDesbloqueo: Boolean get() = true
 
+    /** Tiempo de autobloqueo al salir de esta pantalla. El puente del teclado lo alarga (ajustable). */
+    protected open fun segundosAutobloqueo(): Int = AjustesBoveda.autobloqueoSegundos(applicationContext)
+    protected open val esDelPuente: Boolean get() = false
+
     private var redirigida = false
 
     /** Aquí va lo que normalmente iría en onCreate: solo se llama con la bóveda abierta (o si no hace falta). */
@@ -38,7 +42,7 @@ abstract class ActividadBoveda : ActividadBase() {
     }
 
     override fun onStop() {
-        SesionBoveda.alDetenerPantalla(applicationContext)
+        SesionBoveda.alDetenerPantalla(applicationContext, segundosAutobloqueo(), esDelPuente)
         super.onStop()
     }
 
