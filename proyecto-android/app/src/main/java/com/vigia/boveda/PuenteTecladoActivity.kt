@@ -40,6 +40,10 @@ class PuenteTecladoActivity : ActividadBoveda() {
     // La autenticación se gestiona aquí a mano: no queremos la redirección automática de la base.
     override val requiereDesbloqueo: Boolean get() = false
 
+    override val esDelPuente: Boolean get() = AjustesBoveda.puenteSegundos(this) > 0
+    override fun segundosAutobloqueo(): Int =
+        maxOf(AjustesBoveda.autobloqueoSegundos(this), AjustesBoveda.puenteSegundos(this))
+
     private var receptor: ResultReceiver? = null
     private var idPeticion = ByteArray(0)
     private var clavePublicaTeclado = ByteArray(0)
@@ -94,7 +98,13 @@ class PuenteTecladoActivity : ActividadBoveda() {
             return
         }
 
-        // Autenticación nueva en cada petición: se cierra la sesión y se pide huella/rostro o contraseña maestra.
+        // Ajuste «Desbloqueo del teclado»: con 0 se autentica siempre; con un tiempo, si la bóveda sigue
+        // abierta (clave en memoria, aún dentro de la ventana) se salta la autenticación y solo se elige la credencial.
+        if (AjustesBoveda.puenteSegundos(this) > 0 && SesionBoveda.desbloqueada) {
+            mostrarSelector()
+            return
+        }
+        // Autenticación nueva: se cierra la sesión y se pide huella/rostro o contraseña maestra.
         SesionBoveda.bloquear()
         lanzadorDesbloqueo.launch(
             Intent(this, DesbloqueoActivity::class.java).putExtra(PuenteContrato.ES_PUENTE, true)
