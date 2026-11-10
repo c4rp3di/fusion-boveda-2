@@ -31,12 +31,17 @@ object PuenteContrato {
     const val RES_PUBLICA_BOVEDA = "vigia.puente.res.publica"
     const val RES_IV = "vigia.puente.res.iv"
     const val RES_CIFRADO = "vigia.puente.res.cifrado"
+    /** Texto corto con el motivo de un cierre anómalo (diagnóstico; nunca contiene datos secretos). */
+    const val RES_MOTIVO = "vigia.puente.res.motivo"
 
     // ---- Códigos de resultado
     const val COD_OK = 1
     const val COD_CANCELADO = 2
     const val COD_NO_INICIALIZADA = 3
     const val COD_ERROR = 4
+
+    /** Aviso de vida: La Bóveda mostró su pantalla. NO es una respuesta final. */
+    const val COD_ABIERTA = 10
 
     // ---- Solo La Bóveda: marca interna para que DesbloqueoActivity devuelva el control al puente
     const val ES_PUENTE = "es_puente"
