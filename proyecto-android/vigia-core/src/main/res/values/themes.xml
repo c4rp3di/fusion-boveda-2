@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema oscuro de la suite. Las apps lo usan tal cual o como parent. -->
+    <style name="Theme.VigiaCore" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/vc_acento</item>
+        <item name="colorOnPrimary">@color/vc_fondo</item>
+        <item name="colorSecondary">@color/vc_acento</item>
+        <item name="colorOnSecondary">@color/vc_fondo</item>
+        <item name="colorError">@color/vc_peligro</item>
+        <item name="colorSurface">@color/vc_superficie</item>
+        <item name="colorOnSurface">@color/vc_texto</item>
+        <item name="android:colorBackground">@color/vc_fondo</item>
+        <item name="android:windowBackground">@color/vc_fondo</item>
+        <item name="android:statusBarColor">@color/vc_fondo</item>
+        <item name="android:navigationBarColor">@color/vc_fondo</item>
+        <item name="android:textColorPrimary">@color/vc_texto</item>
+        <item name="android:textColorSecondary">@color/vc_texto_sec</item>
+    </style>
+</resources>
