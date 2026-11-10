@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- :vigia-core no declara permisos ni componentes: cada app de la suite declara solo los suyos. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
