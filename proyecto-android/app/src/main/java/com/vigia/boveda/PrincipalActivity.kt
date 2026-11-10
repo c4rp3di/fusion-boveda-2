@@ -548,6 +548,17 @@ class PrincipalActivity : ActividadBoveda() {
                 mostrar(3)
             }
         }, Vistas.anchoCompleto(this, 6))
+        val opcionesPuente = listOf("Pedir siempre", "Recordar 1 minuto", "Recordar 5 minutos", "Recordar 15 minutos")
+        val valoresPuente = listOf(0, 60, 300, 900)
+        val ipu = valoresPuente.indexOf(AjustesBoveda.puenteSegundos(this)).let { if (it < 0) 2 else it }
+        col.addView(Vistas.boton(this, "Desbloqueo del teclado: " + opcionesPuente[ipu], TipoBoton.TONAL) {
+            Dialogos.elegir(this, "Al usar 🔑 del Teclado Soberano…", opcionesPuente) { i ->
+                AjustesBoveda.setPuenteSegundos(this, valoresPuente[i])
+                mostrar(3)
+            }
+        }, Vistas.anchoCompleto(this, 6))
+        col.addView(Vistas.texto(this, "Con «Recordar», tras usar la 🔑 la bóveda sigue abierta ese tiempo y no pide huella ni contraseña; sigues eligiendo la credencial. La clave solo se guarda en memoria.", true), Vistas.anchoCompleto(this, 6))
+        col.addView(casilla("Mantener abierta con la pantalla apagada durante ese tiempo", AjustesBoveda.puenteSobrevivePantalla(this)) { AjustesBoveda.setPuenteSobrevivePantalla(this, it) })
         col.addView(casilla("Bloquear al apagar la pantalla", AjustesBoveda.bloquearAlApagarPantalla(this)) { AjustesBoveda.setBloquearAlApagarPantalla(this, it) })
         col.addView(casilla("Permitir capturas de pantalla (se aplica al abrir cada pantalla)", AjustesBoveda.permitirCapturas(this)) { AjustesBoveda.setPermitirCapturas(this, it) })
         col.addView(casilla("Usar teclado seguro al desbloquear", AjustesBoveda.tecladoSeguroPorDefecto(this)) { AjustesBoveda.setTecladoSeguroPorDefecto(this, it) })
