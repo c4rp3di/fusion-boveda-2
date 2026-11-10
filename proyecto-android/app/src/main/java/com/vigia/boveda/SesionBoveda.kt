@@ -24,6 +24,10 @@ object SesionBoveda {
     private val manejador = Handler(Looper.getMainLooper())
     private var tareaBloqueo: Runnable? = null
 
+    /** Hasta cuándo (elapsedRealtime) dura la ventana de uso del teclado. */
+    @Volatile
+    private var hastaPuente = 0L
+
     val desbloqueada: Boolean get() = dek != null
 
     fun clave(): ByteArray? = dek
@@ -37,7 +41,11 @@ object SesionBoveda {
             receptorRegistrado = true
             val receptor = object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context, intent: Intent) {
-                    if (AjustesBoveda.bloquearAlApagarPantalla(ctx)) bloquear()
+                    if (!AjustesBoveda.bloquearAlApagarPantalla(ctx)) return
+                    // Opcional: durante la ventana del teclado, apagar la pantalla no bloquea.
+                    val enVentana = AjustesBoveda.puenteSobrevivePantalla(ctx) &&
+                        android.os.SystemClock.elapsedRealtime() < hastaPuente
+                    if (!enVentana) bloquear()
                 }
             }
             ContextCompat.registerReceiver(app, receptor, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -63,10 +71,10 @@ object SesionBoveda {
         }
     }
 
-    fun alDetenerPantalla(c: Context) {
+    fun alDetenerPantalla(c: Context, segundos: Int = AjustesBoveda.autobloqueoSegundos(c), delPuente: Boolean = false) {
         visibles = maxOf(0, visibles - 1)
         if (visibles > 0 || dek == null) return
-        val segundos = AjustesBoveda.autobloqueoSegundos(c)
+        hastaPuente = if (delPuente) android.os.SystemClock.elapsedRealtime() + segundos * 1000L else 0L
         val t = Runnable { bloquear() }
         tareaBloqueo = t
         manejador.postDelayed(t, segundos * 1000L)
